@@ -27,6 +27,7 @@ void bvh_distance_queries_kernel(const torch::Tensor& triangles,
         torch::Tensor* distances,
         torch::Tensor* closest_points,
         torch::Tensor* closest_faces,
+        torch::Tensor* closest_parts,
         int queue_size=256
         );
 
@@ -39,7 +40,9 @@ void bvh_distance_queries_kernel(const torch::Tensor& triangles,
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
-std::vector<torch::Tensor> bvh_distance_queries(torch::Tensor triangles, torch::Tensor points) {
+std::vector<torch::Tensor> bvh_distance_queries(torch::Tensor triangles,
+        torch::Tensor points,
+        int queue_size=128) {
     CHECK_INPUT(triangles);
     CHECK_INPUT(points);
 
@@ -54,6 +57,13 @@ std::vector<torch::Tensor> bvh_distance_queries(torch::Tensor triangles, torch::
     torch::Tensor closest_points = torch::full({
             triangles.size(0), points.size(1), 3},
             -1, options);
+
+    torch::Tensor closest_parts = torch::full({
+            triangles.size(0), points.size(1)}, -1,
+            torch::TensorOptions()
+        .dtype(torch::kLong)
+        .layout(triangles.layout())
+        .device(triangles.device()));
     torch::Tensor closest_faces = torch::full({
             triangles.size(0), points.size(1)},
             -1, torch::TensorOptions()
@@ -62,8 +72,9 @@ std::vector<torch::Tensor> bvh_distance_queries(torch::Tensor triangles, torch::
         .device(triangles.device()));
 
     bvh_distance_queries_kernel(triangles,
-            points, &distances, &closest_points, &closest_faces
-            );
+            points, &distances, &closest_points, &closest_faces,
+            &closest_parts,
+            queue_size);
 
     return {distances, closest_points, closest_faces};
 }
@@ -83,7 +94,8 @@ std::vector<torch::Tensor> bvh_distance_queries(torch::Tensor triangles, torch::
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("distance_queries", &bvh_distance_queries, "BVH distance queries forward (CUDA)",
-        py::arg("triangles"), py::arg("points"));
+        py::arg("triangles"), py::arg("points"),
+        py::arg("queue_size") = 128);
   // m.def("self_distance_queries", &bvh_self_distance_queries, "BVH self distance queries forward (CUDA)",
         // py::arg("triangles"));
 }

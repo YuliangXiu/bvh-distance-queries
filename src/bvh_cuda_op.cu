@@ -19,6 +19,7 @@
 #include "device_launch_parameters.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
+// #include <cuda_profiler_api.h>
 
 #include <thrust/device_vector.h>
 #include <thrust/functional.h>
@@ -47,7 +48,7 @@
 
 // Number of threads per block for CUDA kernel launch
 #ifndef NUM_THREADS
-#define NUM_THREADS 128
+#define NUM_THREADS 256
 #endif
 
 #ifndef FORCE_INLINE
@@ -158,20 +159,21 @@ __host__ __device__ T pointToTriangleDistance(vec3<T> p,
   vec3<T> pc = p - c;
   vec3<T> nor = cross(ba, ac);
 
-  return sqrt(
-      (sign<T>(dot(cross(ba, nor), pa)) + sign<T>(dot(cross(cb, nor), pb)) +
-           sign<T>(dot(cross(ac, nor), pc)) <
-       2.0)
-          ? min(min(dot2<T>(ba * clamp(dot(ba, pa) / dot2<T>(ba), 0.0, 1.0) -
-                            pa),
-                    dot2<T>(cb * clamp(dot(cb, pb) / dot2<T>(cb), 0.0, 1.0) -
-                            pb)),
-                dot2<T>(ac * clamp(dot(ac, pc) / dot2<T>(ac), 0.0, 1.0) - pc))
-          : dot(nor, pa) * dot(nor, pa) / dot2<T>(nor));
+  return (sign<T>(dot(cross(ba, nor), pa)) + sign<T>(dot(cross(cb, nor), pb)) +
+              sign<T>(dot(cross(ac, nor), pc)) <
+          2.0)
+             ? min(min(dot2<T>(ba * clamp(dot(ba, pa) / dot2<T>(ba), 0.0, 1.0) -
+                               pa),
+                       dot2<T>(cb * clamp(dot(cb, pb) / dot2<T>(cb), 0.0, 1.0) -
+                               pb)),
+                   dot2<T>(ac * clamp(dot(ac, pc) / dot2<T>(ac), 0.0, 1.0) -
+                           pc))
+             : dot(nor, pa) * dot(nor, pa) / dot2<T>(nor);
 }
 
 template <typename T>
 __host__ __device__ T pointToTriangleDistance(vec3<T> p, TrianglePtr<T> tri_ptr,
+                                              long *closest_part,
                                               vec3<T> *closest_point) {
   vec3<T> a = tri_ptr->v0;
   vec3<T> b = tri_ptr->v1;
@@ -197,18 +199,21 @@ __host__ __device__ T pointToTriangleDistance(vec3<T> p, TrianglePtr<T> tri_ptr,
   T tnom = dot(p - a, ac), tdenom = dot(p - c, a - c);
   if (snom <= static_cast<T>(0.0) && tnom <= static_cast<T>(0.0)) {
     *closest_point = a;
-    return sqrt(dot(pa, pa));
+    // *closest_part =
+    return dot(pa, pa);
   }
   // Compute parametric position u for projection P’ of P on BC,
   // P’ = B + u*BC, u = unom/(unom+udenom)
   T unom = dot(p - b, bc), udenom = dot(p - c, b - c);
   if (sdenom <= static_cast<T>(0.0) && unom <= static_cast<T>(0.0)) {
     *closest_point = b;
-    return sqrt(dot(pb, pb));
+    // *closest_part =
+    return dot(pb, pb);
   }
   if (tdenom <= static_cast<T>(0.0f) && udenom <= static_cast<T>(0.0f)) {
     *closest_point = c;
-    return sqrt(dot(pc, pc));
+    // *closest_part =
+    return dot(pc, pc);
   }
   // P is outside (or on) AB if the triple scalar product [N PA PB] <= 0
   vec3<T> n = cross(b - a, c - a);
@@ -218,7 +223,8 @@ __host__ __device__ T pointToTriangleDistance(vec3<T> p, TrianglePtr<T> tri_ptr,
   if (vc <= static_cast<T>(0.0f) && snom >= static_cast<T>(0.0f) &&
       sdenom >= static_cast<T>(0.0f)) {
     *closest_point = a + snom / (snom + sdenom) * ab;
-    return sqrt(dot(p - *closest_point, p - *closest_point));
+    // *closest_part =
+    return dot(p - *closest_point, p - *closest_point);
   }
   // P is outside (or on) BC if the triple scalar product [N PB PC] <= 0
   T va = dot(n, cross(b - p, c - p));
@@ -227,7 +233,8 @@ __host__ __device__ T pointToTriangleDistance(vec3<T> p, TrianglePtr<T> tri_ptr,
   if (va <= static_cast<T>(0.0f) && unom >= static_cast<T>(0.0f) &&
       udenom >= static_cast<T>(0.0f)) {
     *closest_point = b + unom / (unom + udenom) * bc;
-    return sqrt(dot(p - *closest_point, p - *closest_point));
+    // *closest_part =
+    return dot(p - *closest_point, p - *closest_point);
   }
   // P is outside (or on) CA if the triple scalar product [N PC PA] <= 0
   T vb = dot(n, cross(c - p, a - p));
@@ -236,14 +243,16 @@ __host__ __device__ T pointToTriangleDistance(vec3<T> p, TrianglePtr<T> tri_ptr,
   if (vb <= static_cast<T>(0.0f) && tnom >= static_cast<T>(0.0f) &&
       tdenom >= static_cast<T>(0.0f)) {
     *closest_point = a + tnom / (tnom + tdenom) * ac;
-    return sqrt(dot(p - *closest_point, p - *closest_point));
+    // *closest_part =
+    return dot(p - *closest_point, p - *closest_point);
   }
   // P must project inside face region. Compute Q using barycentric coordinates
   T u = va / (va + vb + vc);
   T v = vb / (va + vb + vc);
   T w = static_cast<T>(1.0f) - u - v; // = vc / (va + vb + vc))
   *closest_point = u * a + v * b + w * c;
-  return sqrt(dot(p - *closest_point, p - *closest_point));
+    // *closest_part =
+  return dot(p - *closest_point, p - *closest_point);
 }
 
 template <typename T>
@@ -286,7 +295,8 @@ __device__
 
 template <typename T, int QueueSize = 32>
 __device__ T traverseBVH(const vec3<T> &queryPoint, BVHNodePtr<T> root,
-                         long *closest_face, vec3<T> *closestPoint) {
+                         long *closest_face, long *closest_part,
+                         vec3<T> *closestPoint) {
   // Allocate traversal stack from thread-local memory,
   // and push NULL to indicate that there are no postponed nodes.
   PriorityQueue<T, BVHNodePtr<T>, QueueSize> queue;
@@ -321,12 +331,17 @@ __device__ T traverseBVH(const vec3<T> &queryPoint, BVHNodePtr<T> root,
         // If  the child is a leaf then
         TrianglePtr<T> tri_ptr = childL->tri_ptr;
         vec3<T> curr_clos_point;
+        long curr_closest_part;
+
         T distance_left =
-            pointToTriangleDistance<T>(queryPoint, tri_ptr, &curr_clos_point);
+            pointToTriangleDistance<T>(queryPoint, tri_ptr,
+                    &curr_closest_part,
+                    &curr_clos_point);
         if (distance_left <= closest_distance) {
           closest_distance = distance_left;
           *closest_face = childL->idx;
           *closestPoint = curr_clos_point;
+          *closest_part = curr_closest_part;
         }
       } else {
         queue.insert_key(distance_left, childL);
@@ -338,20 +353,23 @@ __device__ T traverseBVH(const vec3<T> &queryPoint, BVHNodePtr<T> root,
         // If  the child is a leaf then
         TrianglePtr<T> tri_ptr = childR->tri_ptr;
         vec3<T> curr_clos_point;
+        long curr_closest_part;
+
         T distance_right =
-            pointToTriangleDistance<T>(queryPoint, tri_ptr, &curr_clos_point);
+            pointToTriangleDistance<T>(queryPoint, tri_ptr,
+                    &curr_closest_part,
+                    &curr_clos_point);
         if (distance_right <= closest_distance) {
           closest_distance = distance_right;
           *closest_face = childR->idx;
           *closestPoint = curr_clos_point;
-          // printf("Child R: %f, %d\n", closest_distance, *closest_face);
+          *closest_part = curr_closest_part;
         }
       } else {
         queue.insert_key(distance_right, childR);
       }
     }
   }
-  // printf("%d\n", *closest_face);
 
   return closest_distance;
 }
@@ -359,20 +377,22 @@ __device__ T traverseBVH(const vec3<T> &queryPoint, BVHNodePtr<T> root,
 template <typename T, int QueueSize = 32>
 __global__ void findNearestNeighbor(vec3<T> *query_points, T *distances,
                                     vec3<T> *closest_points,
-                                    long *closest_faces, BVHNodePtr<T> root,
-                                    int num_points) {
+                                    long *closest_faces, long *closest_parts,
+                                    BVHNodePtr<T> root, int num_points) {
   for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < num_points;
        idx += blockDim.x * gridDim.x) {
     vec3<T> query_point = query_points[idx];
 
     long closest_face;
+    long closest_part;
     vec3<T> closest_point;
 
-    T closest_distance =
-        traverseBVH<T, QueueSize>(query_point, root, &closest_face, &closest_point);
+    T closest_distance = traverseBVH<T, QueueSize>(
+        query_point, root, &closest_face, &closest_part, &closest_point);
     distances[idx] = closest_distance;
     closest_points[idx] = closest_point;
     closest_faces[idx] = closest_face;
+    closest_parts[idx] = closest_part;
   }
   return;
 }
@@ -466,7 +486,6 @@ template <typename T>
 __global__ void BuildRadixTree(MortonCode *morton_codes, int num_triangles,
                                int *triangle_ids, BVHNodePtr<T> internal_nodes,
                                BVHNodePtr<T> leaf_nodes) {
-  int idx = blockDim.x * blockIdx.x + threadIdx.x;
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < num_triangles - 1;
        idx += blockDim.x * gridDim.x) {
     // if (idx >= num_triangles - 1)
@@ -806,7 +825,8 @@ void bvh_distance_queries_kernel(const torch::Tensor &triangles,
                                  torch::Tensor *distances,
                                  torch::Tensor *closest_points,
                                  torch::Tensor *closest_faces,
-                                 int queue_size=128) {
+                                 torch::Tensor *closest_parts,
+                                 int queue_size = 128) {
   const auto batch_size = triangles.size(0);
   const auto num_triangles = triangles.size(1);
   const auto num_points = points.size(1);
@@ -823,75 +843,89 @@ void bvh_distance_queries_kernel(const torch::Tensor &triangles,
 #endif
 
   // Construct the bvh tree
-  // AT_DISPATCH_FLOATING_TYPES(
-  // triangles.type(), "bvh_tree_building", ([&] {
-  thrust::device_vector<BVHNode<float>> leaf_nodes(num_triangles);
-  thrust::device_vector<BVHNode<float>> internal_nodes(num_triangles - 1);
-  auto triangle_float_ptr = triangles.data<float>();
+  AT_DISPATCH_FLOATING_TYPES(
+      triangles.type(), "bvh_tree_building", ([&] {
+        thrust::device_vector<BVHNode<scalar_t>> leaf_nodes(num_triangles);
+        thrust::device_vector<BVHNode<scalar_t>> internal_nodes(num_triangles -
+                                                                1);
+        auto triangle_scalar_t_ptr = triangles.data<scalar_t>();
 
-  int numSMs;
-  cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
+        int numSMs;
+        cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
 
-  for (int bidx = 0; bidx < batch_size; ++bidx) {
+        for (int bidx = 0; bidx < batch_size; ++bidx) {
 
-    Triangle<float> *triangles_ptr =
-        (TrianglePtr<float>)triangle_float_ptr + num_triangles * bidx;
-
-    // thrust::fill(collisionIndices.begin(), collisionIndices.end(),
-    // make_long2(-1, -1));
-
-#if DEBUG_PRINT == 1
-    std::cout << "Start building BVH" << std::endl;
-#endif
-    buildBVH<float, NUM_THREADS>(
-            internal_nodes.data().get(), leaf_nodes.data().get(),
-            triangles_ptr, &triangle_ids, num_triangles, batch_size);
-#if DEBUG_PRINT == 1
-    std::cout << "Successfully built BVH" << std::endl;
-#endif
+          Triangle<scalar_t> *triangles_ptr =
+              (TrianglePtr<scalar_t>)triangle_scalar_t_ptr +
+              num_triangles * bidx;
 
 #if DEBUG_PRINT == 1
-    std::cout << "Start BVH traversal" << std::endl;
+          std::cout << "Start building BVH" << std::endl;
 #endif
-    auto distances_float_ptr = distances->data<float>();
-    auto closest_points_float_ptr = closest_points->data<float>();
-    auto closest_faces_long_ptr = closest_faces->data<long>();
-
-    vec3<float> *closest_points_ptr =
-        (vec3<float> *)closest_points_float_ptr + num_points * bidx;
-    long *closest_faces_ptr =
-        (long *)closest_faces_long_ptr + num_points * bidx;
-    float *distances_ptr = (float *)distances_float_ptr + num_points * bidx;
-
-    vec3<float> *points_ptr =
-        (vec3<float> *)points.data<float>() + num_points * bidx;
-
-    if (queue_size == 32) {
-        findNearestNeighbor<float, 32><<<32 * numSMs, 256>>>(
-                points_ptr, distances_ptr, closest_points_ptr, closest_faces_ptr,
-                internal_nodes.data().get(), num_points);
-    }
-    else if (queue_size == 64){
-        findNearestNeighbor<float, 64><<<32 * numSMs, 256>>>(
-                points_ptr, distances_ptr, closest_points_ptr, closest_faces_ptr,
-                internal_nodes.data().get(), num_points);
-    }
-    else if (queue_size == 128){
-        findNearestNeighbor<float, 128><<<32 * numSMs, 256>>>(
-                points_ptr, distances_ptr, closest_points_ptr, closest_faces_ptr,
-                internal_nodes.data().get(), num_points);
-    }
-    else if (queue_size == 256){
-        findNearestNeighbor<float, 256><<<32 * numSMs, 256>>>(
-                points_ptr, distances_ptr, closest_points_ptr, closest_faces_ptr,
-                internal_nodes.data().get(), num_points);
-    }
-
-    cudaCheckError();
+          buildBVH<scalar_t, NUM_THREADS>(
+              internal_nodes.data().get(), leaf_nodes.data().get(),
+              triangles_ptr, &triangle_ids, num_triangles, batch_size);
+#if DEBUG_PRINT == 1
+          std::cout << "Successfully built BVH" << std::endl;
+#endif
 
 #if DEBUG_PRINT == 1
-    std::cout << "Successfully finished BVH traversal" << std::endl;
+          std::cout << "Start BVH traversal" << std::endl;
 #endif
-  }
-  // }));
+          auto distances_scalar_t_ptr = distances->data<scalar_t>();
+          auto closest_points_scalar_t_ptr = closest_points->data<scalar_t>();
+          auto closest_faces_long_ptr = closest_faces->data<long>();
+          auto closest_parts_long_ptr = closest_parts->data<long>();
+
+          vec3<scalar_t> *closest_points_ptr =
+              (vec3<scalar_t> *)closest_points_scalar_t_ptr + num_points * bidx;
+          long *closest_faces_ptr =
+              (long *)closest_faces_long_ptr + num_points * bidx;
+          long *closest_parts_ptr =
+              (long *)closest_parts_long_ptr + num_points * bidx;
+          scalar_t *distances_ptr =
+              (scalar_t *)distances_scalar_t_ptr + num_points * bidx;
+
+          vec3<scalar_t> *points_ptr =
+              (vec3<scalar_t> *)points.data<scalar_t>() + num_points * bidx;
+
+          // cudaProfilerStart();
+          // struct timeval t1, t2;
+          // gettimeofday(&t1, 0);
+          if (queue_size == 32) {
+            findNearestNeighbor<scalar_t, 32><<<32 * numSMs, NUM_THREADS>>>(
+                points_ptr, distances_ptr, closest_points_ptr,
+                closest_faces_ptr, closest_parts_ptr,
+                internal_nodes.data().get(), num_points);
+          } else if (queue_size == 64) {
+            findNearestNeighbor<scalar_t, 64><<<32 * numSMs, NUM_THREADS>>>(
+                points_ptr, distances_ptr, closest_points_ptr,
+                closest_faces_ptr, closest_parts_ptr,
+                internal_nodes.data().get(), num_points);
+          } else if (queue_size == 128) {
+            findNearestNeighbor<scalar_t, 128><<<32 * numSMs, NUM_THREADS>>>(
+                points_ptr, distances_ptr, closest_points_ptr,
+                closest_faces_ptr, closest_parts_ptr,
+                internal_nodes.data().get(), num_points);
+          } else if (queue_size == 256) {
+            findNearestNeighbor<scalar_t, 256><<<32 * numSMs, NUM_THREADS>>>(
+                points_ptr, distances_ptr, closest_points_ptr,
+                closest_faces_ptr, closest_parts_ptr,
+                internal_nodes.data().get(), num_points);
+          }
+      // cudaProfilerStop();
+      cudaCheckError();
+      // cudaDeviceSynchronize();
+      // gettimeofday(&t2, 0);
+
+      // double time = (1000000.0*(t2.tv_sec-t1.tv_sec) +
+      // t2.tv_usec-t1.tv_usec)/1000.0;
+
+      // printf("Time to generate:  %3.1f ms \n", time);
+
+#if DEBUG_PRINT == 1
+          std::cout << "Successfully finished BVH traversal" << std::endl;
+#endif
+        }
+      }));
 }
