@@ -62,15 +62,19 @@ if __name__ == "__main__":
     parser.add_argument('--num-query-points', type=int, default=1,
                         dest='num_query_points',
                         help='Number of random query points')
+    parser.add_argument('--seed', type=int, default=None,
+                        help='If given then set the seed')
 
     args, _ = parser.parse_known_args()
 
     mesh_fn = args.mesh_fn
     num_query_points = args.num_query_points
+    seed = args.seed
 
     input_mesh = Mesh(filename=mesh_fn)
 
-    torch.manual_seed(0)
+    if seed is not None:
+        torch.manual_seed(seed)
 
     logger.info(f'Number of triangles = {input_mesh.f.shape[0]}')
 
@@ -126,20 +130,25 @@ if __name__ == "__main__":
     #  logger.info(f'Distances: {sqrD}')
     #  logger.info(f'Closest points: {closest_points_eig}')
 
-    logger.info(np.mean((distances.squeeze() ** 2 - sqrD.squeeze()) ** 2))
+    dist_distance = np.mean((distances.squeeze() - sqrD.squeeze()) ** 2)
+    logger.info(f'Distance between squared distances: {dist_distance}')
     #  logger.info(closest_points.shape)
     #  logger.info(closest_points_eig.shape)
-    logger.info(np.mean(np.power(
+
+    point_dist = np.mean(np.power(
         closest_points.squeeze() -
-        closest_points_eig.squeeze(), 2).sum(axis=-1)))
+        closest_points_eig.squeeze(), 2).sum(axis=-1))
+    logger.info(f'Distance between CUDA and IGL points: {point_dist}')
+    #  logger.info(closest_points.squeeze())
+    #  logger.info(closest_points_eig.squeeze())
 
     #  np.testing.assert_almost_equal(distances.squeeze() ** 2,
-                                   #  sqrD.squeeze())
+    #  sqrD.squeeze())
     #  np.testing.assert_almost_equal(closest_points.squeeze(),
-                                   #  closest_points_eig.squeeze())
+    #  closest_points_eig.squeeze())
     #  for idx in range(num_query_points):
-        #  logger.info(
-            #  f'Mine {closest_points[idx]} vs igl {closest_points_eig[idx]}')
+    #  logger.info(
+    #  f'Mine {closest_points[idx]} vs igl {closest_points_eig[idx]}')
     #  print(closest_faces_idx)
 
     mesh = o3d.geometry.TriangleMesh()
@@ -160,10 +169,12 @@ if __name__ == "__main__":
 
     closest_points_pcl_eig = o3d.geometry.PointCloud()
     closest_points_pcl_eig.points = o3d.utility.Vector3dVector(
-        closest_points.reshape(-1, 3))
+        closest_points_eig.reshape(-1, 3))
     closest_points_pcl_eig.paint_uniform_color([0.3, 0.9, 0.3])
 
-    o3d.visualization.draw_geometries([mesh, query_pcl,
-                                       closest_points_pcl,
-                                       #  closest_points_pcl_eig
-                                       ])
+    o3d.visualization.draw_geometries([
+        mesh,
+        #  query_pcl,
+        closest_points_pcl,
+        closest_points_pcl_eig
+    ])
