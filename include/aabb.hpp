@@ -11,7 +11,9 @@
 #include "helper_math.h"
 
 
-template <typename T> struct AABB {
+template <typename T>
+__align__(32)
+struct AABB {
 public:
   __host__ __device__ AABB() {
     min_t.x = std::is_same<T, float>::value ? FLT_MAX : DBL_MAX;
@@ -83,12 +85,13 @@ public:
 
 
 template <typename T>
+__forceinline__
 __host__ __device__ T pointToAABBDistance(vec3<T> point, const AABB<T>& bbox ) {
   T diff_x = point.x - clamp<T>(point.x, bbox.min_t.x, bbox.max_t.x);
   T diff_y = point.y - clamp<T>(point.y, bbox.min_t.y, bbox.max_t.y);
   T diff_z = point.z - clamp<T>(point.z, bbox.min_t.z, bbox.max_t.z);
 
-  return sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
+  return diff_x * diff_x + diff_y * diff_y + diff_z * diff_z;
 }
 
 
