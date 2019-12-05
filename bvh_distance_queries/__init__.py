@@ -10,10 +10,12 @@
 #
 # Copyright©2019 Max-Planck-Gesellschaft zur Förderung
 # der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
-# for Intelligent Systems and the Max Planck Institute for Biological
-# Cybernetics. All rights reserved.
+# for Intelligent Systems. All rights reserved.
 #
+# @author Vasileios Choutas
+# Contact: vassilis.choutas@tuebingen.mpg.de
 # Contact: ps-license@tuebingen.mpg.de
 
 import torch
 from .bvh_search_tree import BVH
+from .mesh_distance import PointToMeshResidual
