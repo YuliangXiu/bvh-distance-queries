@@ -1,19 +1,23 @@
 /*
-   Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
-   holder of all proprietary rights on this computer program.
-   You can only use this computer program if you have closed
-   a license agreement with MPG or you get the right to use the computer
-   program from someone who is authorized to grant you that right.
-   Any use of the computer program without a valid license is prohibited and
-   liable to prosecution.
-
-   Copyright©2019 Max-Planck-Gesellschaft zur Förderung
-   der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
-   for Intelligent Systems and the Max Planck Institute for Biological
-   Cybernetics. All rights reserved.
-
-   Contact: ps-license@tuebingen.mpg.de
+ * Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
+ * holder of all proprietary rights on this computer program.
+ * You can only use this computer program if you have closed
+ * a license agreement with MPG or you get the right to use the computer
+ * program from someone who is authorized to grant you that right.
+ * Any use of the computer program without a valid license is prohibited and
+ * liable to prosecution.
+ *
+ * Copyright©2019 Max-Planck-Gesellschaft zur Förderung
+ * der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+ * for Intelligent Systems. All rights reserved.
+ *
+ * @author Vasileios Choutas
+ * Contact: vassilis.choutas@tuebingen.mpg.de
+ * Contact: ps-license@tuebingen.mpg.de
+ *
 */
+
+
 
 #include <iostream>
 #include <vector>
@@ -27,7 +31,7 @@ void bvh_distance_queries_kernel(const torch::Tensor& triangles,
         torch::Tensor* distances,
         torch::Tensor* closest_points,
         torch::Tensor* closest_faces,
-        torch::Tensor* closest_parts,
+        torch::Tensor* closest_bcs,
         int queue_size=128,
         bool sort_points_by_morton=true
         );
@@ -59,12 +63,9 @@ std::vector<torch::Tensor> bvh_distance_queries(torch::Tensor triangles,
     torch::Tensor closest_points = torch::full({
             triangles.size(0), points.size(1), 3},
             -1, options);
-    torch::Tensor closest_parts = torch::full({
-            triangles.size(0), points.size(1)}, -1,
-            torch::TensorOptions()
-        .dtype(torch::kLong)
-        .layout(triangles.layout())
-        .device(triangles.device()));
+    torch::Tensor closest_bcs = torch::full({
+            triangles.size(0), points.size(1), 3}, 0,
+            options);
     torch::Tensor closest_faces = torch::full({
             triangles.size(0), points.size(1)},
             -1, torch::TensorOptions()
@@ -74,10 +75,10 @@ std::vector<torch::Tensor> bvh_distance_queries(torch::Tensor triangles,
 
     bvh_distance_queries_kernel(triangles,
             points, &distances, &closest_points, &closest_faces,
-            &closest_parts,
+            &closest_bcs,
             queue_size, sort_points_by_morton);
 
-    return {distances, closest_points, closest_faces};
+    return {distances, closest_points, closest_faces, closest_bcs};
 }
 
 // std::vector<torch::Tensor> bvh_self_distance_queries(torch::Tensor triangles) {
