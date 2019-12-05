@@ -10,9 +10,10 @@
 #
 # Copyright©2019 Max-Planck-Gesellschaft zur Förderung
 # der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
-# for Intelligent Systems and the Max Planck Institute for Biological
-# Cybernetics. All rights reserved.
+# for Intelligent Systems. All rights reserved.
 #
+# Author: Vasileios Choutas
+# Contact: vassilis.choutas@tuebingen.mpg.de
 # Contact: ps-license@tuebingen.mpg.de
 
 from __future__ import absolute_import
@@ -32,9 +33,6 @@ except NameError:
     pass
 
 import open3d as o3d
-import pyigl as igl
-from iglhelpers import p2e, e2p
-
 
 import torch
 import torch.nn as nn
@@ -95,61 +93,16 @@ if __name__ == "__main__":
     triangles = vertices[faces].unsqueeze(dim=0)
 
     m = bvh_distance_queries.BVH()
+
     torch.cuda.synchronize()
     start = time.perf_counter()
-    distances, closest_points, closest_faces = m(triangles, query_points)
+    distances, closest_points, closest_faces, closest_bcs = m(
+        triangles, query_points)
     torch.cuda.synchronize()
     logger.info(f'CUDA Elapsed time {time.perf_counter() - start}')
     #  print(outputs[2])
     distances = distances.detach().cpu().numpy()
     closest_points = closest_points.detach().cpu().numpy().squeeze()
-
-    #  logger.info(f'Distances: {distances ** 2}')
-    #  logger.info(f'Closest points: {closest_points}')
-
-    #  outputs = outputs.detach().cpu().numpy().squeeze()
-
-    sqrD = igl.eigen.MatrixXd()
-    closest_faces = igl.eigen.MatrixXi()
-    closest_points_eig = igl.eigen.MatrixXd()
-
-    query_points_eigen = p2e(query_points_np)
-
-    start = time.perf_counter()
-    # Find the closest points on the SMPL-X mesh
-    igl.point_mesh_squared_distance(query_points_eigen,
-                                    p2e(v),
-                                    p2e(input_mesh.f.astype(np.int64)),
-                                    sqrD, closest_faces, closest_points_eig)
-    logger.info(f'LibIGL Elapsed time {time.perf_counter() - start}')
-
-    sqrD = e2p(sqrD)
-    closest_faces_idx = e2p(closest_faces).squeeze()
-    closest_points_eig = e2p(closest_points_eig).squeeze()
-
-    #  logger.info(f'Distances: {sqrD}')
-    #  logger.info(f'Closest points: {closest_points_eig}')
-
-    dist_distance = np.mean((distances.squeeze() - sqrD.squeeze()) ** 2)
-    logger.info(f'Distance between squared distances: {dist_distance}')
-    #  logger.info(closest_points.shape)
-    #  logger.info(closest_points_eig.shape)
-
-    point_dist = np.mean(np.power(
-        closest_points.squeeze() -
-        closest_points_eig.squeeze(), 2).sum(axis=-1))
-    logger.info(f'Distance between CUDA and IGL points: {point_dist}')
-    #  logger.info(closest_points.squeeze())
-    #  logger.info(closest_points_eig.squeeze())
-
-    #  np.testing.assert_almost_equal(distances.squeeze() ** 2,
-    #  sqrD.squeeze())
-    #  np.testing.assert_almost_equal(closest_points.squeeze(),
-    #  closest_points_eig.squeeze())
-    #  for idx in range(num_query_points):
-    #  logger.info(
-    #  f'Mine {closest_points[idx]} vs igl {closest_points_eig[idx]}')
-    #  print(closest_faces_idx)
 
     mesh = o3d.geometry.TriangleMesh()
     mesh.vertices = o3d.utility.Vector3dVector(v)
@@ -167,14 +120,8 @@ if __name__ == "__main__":
         closest_points.reshape(-1, 3))
     closest_points_pcl.paint_uniform_color([0.3, 0.3, 0.9])
 
-    closest_points_pcl_eig = o3d.geometry.PointCloud()
-    closest_points_pcl_eig.points = o3d.utility.Vector3dVector(
-        closest_points_eig.reshape(-1, 3))
-    closest_points_pcl_eig.paint_uniform_color([0.3, 0.9, 0.3])
-
     o3d.visualization.draw_geometries([
         mesh,
-        #  query_pcl,
+        query_pcl,
         closest_points_pcl,
-        closest_points_pcl_eig
     ])
