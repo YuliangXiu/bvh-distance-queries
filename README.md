@@ -78,6 +78,7 @@ python setup.py build develop
 
 ## Example dependencies
 
+1. [open3d](http://www.open3d.org/)
 1. [mesh](https://github.com/MPI-IS/mesh)
 
 ## Citation
