@@ -33,4 +33,7 @@ __host__ __device__ __forceinline__ T clamp(T value, T min_value, T max_value) {
   return min(max(value, min_value), max_value);
 }
 
+template <typename T> __host__ __device__ T dot2(vec3<T> v) {
+  return dot(v, v);
+}
 #endif // ifndef MATH_UTILS_H
