@@ -77,15 +77,17 @@ if __name__ == "__main__":
     logger.info(f'Number of triangles = {input_mesh.f.shape[0]}')
 
     v = input_mesh.v
-    v -= v.mean(keepdims=True, axis=0)
 
     vertices = torch.tensor(v, dtype=torch.float32, device=device)
     faces = torch.tensor(input_mesh.f.astype(np.int64),
                          dtype=torch.long,
                          device=device)
 
+    min_vals, _ = torch.min(vertices, dim=0, keepdim=True)
+    max_vals, _ = torch.max(vertices, dim=0, keepdim=True)
+
     query_points = torch.rand([1, num_query_points, 3], dtype=torch.float32,
-                              device=device) * 2 - 1
+                              device=device) * (max_vals - min_vals) + min_vals
     query_points_np = query_points.detach().cpu().numpy().squeeze(
         axis=0).astype(np.float32).reshape(num_query_points, 3)
 
@@ -100,7 +102,6 @@ if __name__ == "__main__":
         triangles, query_points)
     torch.cuda.synchronize()
     logger.info(f'CUDA Elapsed time {time.perf_counter() - start}')
-    #  print(outputs[2])
     distances = distances.detach().cpu().numpy()
     closest_points = closest_points.detach().cpu().numpy().squeeze()
 
