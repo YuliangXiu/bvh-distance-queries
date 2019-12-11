@@ -23,13 +23,6 @@ import time
 
 import argparse
 
-try:
-    input = raw_input
-except NameError:
-    pass
-
-import open3d as o3d
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -42,8 +35,9 @@ from loguru import logger
 
 from psbody.mesh import Mesh
 from psbody.mesh.meshviewer import MeshViewer
-import bvh_distance_queries
 import kornia
+
+import bvh_distance_queries
 
 
 if __name__ == "__main__":
@@ -51,7 +45,12 @@ if __name__ == "__main__":
     device = torch.device('cuda')
 
     parser = argparse.ArgumentParser()
+
+    parser.add_argument('--pause', type=float, default=None,
+                        help='Pause duration for the viewer')
+
     args, _ = parser.parse_known_args()
+    pause = args.pause
 
     batch_size = 1
     m = bvh_distance_queries.PointToMeshResidual()
@@ -82,7 +81,7 @@ if __name__ == "__main__":
     scan = deepcopy(template)
     scan.vc = np.ones_like(scan.v) * [0.3, 0.3, 0.3]
 
-    mv = MeshViewer(keepalive=True)
+    mv = MeshViewer()
 
     def closure(visualize=False, backward=True):
         if backward:
@@ -106,24 +105,26 @@ if __name__ == "__main__":
         if visualize:
             template.v = vertices.detach().cpu().numpy().squeeze()
             mv.set_static_meshes([template, scan])
-            time.sleep(1)
+            if pause is not None:
+                time.sleep(pause)
+            else:
+                logger.info('Press escape to exit ...')
+                logger.info('Waiting for key ...')
+                key = mv.get_keypress()
+                if key == b'\x1b':
+                    logger.warning('Exiting!')
+                    sys.exit(0)
 
         return loss
 
     closure(visualize=True, backward=False)
     N = 1000
-    for _ in range(N):
+    for n in range(N):
         curr_loss = optimizer.step(closure)
-        #  logger.info(
-            #  f'{template_translation.squeeze()}, {template_rotation.squeeze()}')
         closure(visualize=True, backward=False)
 
         verts_dist = np.sqrt(np.power(
             scan_points.detach().cpu().numpy().squeeze() - template.v,
             2).sum(axis=-1)).mean()
-        logger.info(f'Vertex-to-vertex distance: {verts_dist} (m)')
-
-    #  logger.info(f'Distances: {distances ** 2}')
-    #  logger.info(f'Closest points: {closest_points}')
-
-    #  outputs = outputs.detach().cpu().numpy().squeeze()
+        logger.info(f'[{n:03d}]: {curr_loss.item():.4f}')
+        logger.info(f'[{n:03d}]: Vertex-to-vertex distance: {verts_dist} (m)')
