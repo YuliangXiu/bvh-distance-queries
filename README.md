@@ -71,6 +71,14 @@ python setup.py build develop
   python examples/fit_cube_to_cube.py
   ```
 
+* [Fit a cube to random points](./examples/fit_cube_to_random_points.py):
+  First generate a set of random points and compute their convex hull, which
+  gives us a dummy scan. We then try to rigidly align a cube to this scan using
+  the provided point-to-mesh residuals.
+  ```Shell
+  python examples/fit_cube_to_random_points.py 
+  ```
+
 ## Dependencies
 
 1. [PyTorch](https://pytorch.org)
