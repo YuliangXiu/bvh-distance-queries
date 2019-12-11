@@ -44,7 +44,8 @@ if __name__ == "__main__":
 
     device = torch.device('cuda')
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--pause', type=float, default=None,
                         help='Pause duration for the viewer')

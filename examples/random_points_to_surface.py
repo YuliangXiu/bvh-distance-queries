@@ -53,7 +53,8 @@ if __name__ == "__main__":
 
     device = torch.device('cuda')
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--mesh-fn', type=str, dest='mesh_fn',
                         help='A mesh file (.obj, .ply, e.t.c.) to be checked' +
                         ' for collisions')

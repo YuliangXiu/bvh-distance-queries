@@ -45,7 +45,8 @@ if __name__ == "__main__":
 
     device = torch.device('cuda')
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--num-query-points', type=int, default=1,
                         dest='num_query_points',
                         help='Number of random query points')
