@@ -47,10 +47,6 @@
 #include "priority_queue.hpp"
 #include "triangle.hpp"
 
-#ifndef EPSILON
-#define EPSILON 1e-16
-#endif /* ifndef EPSILON */
-
 // Number of threads per block for CUDA kernel launch
 #ifndef NUM_THREADS
 #define NUM_THREADS 256
