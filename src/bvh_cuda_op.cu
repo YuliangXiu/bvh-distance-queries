@@ -58,7 +58,7 @@
 
 #ifndef PROFILING
 #define PROFILING 0
-#endif /* ifndef ERROR_CHECKING */
+#endif /* ifndef PROFILING */
 
 #ifndef ERROR_CHECKING
 #define ERROR_CHECKING 1
