@@ -60,16 +60,14 @@ bvh_include_dirs = torch.utils.cpp_extension.include_paths() + [
     'include',
     osp.expandvars('$CUDA_SAMPLES_INC')]
 
-bvh_extra_compile_args = {'nvcc': ['-DPRINT_TIMINGS=0', '-DDEBUG_PRINT=0',
+bvh_extra_compile_args = {'nvcc': ['-DPRINT_TIMINGS=0',
+                                   '-DDEBUG_PRINT=0',
                                    '-DERROR_CHECKING=1'],
-                          #  'cxx': ['-D_GLIBCXX_USE_CXX11_ABI=0']}
                           'cxx': []}
 bvh_extension = CUDAExtension('bvh_distance_queries_cuda',
                               bvh_src_files,
                               include_dirs=bvh_include_dirs,
                               extra_compile_args=bvh_extra_compile_args)
-
-render_reqs = ['pyrender>=0.1.23', 'trimesh>=2.37.6', 'shapely']
 
 setup(name=NAME,
       version=about['__version__'],
@@ -91,8 +89,4 @@ setup(name=NAME,
       install_requires=[
           'torch>=1.0.1',
       ],
-      extras_require={
-          'render': render_reqs,
-          'all': render_reqs
-      },
       cmdclass={'build_ext': BuildExtension})
