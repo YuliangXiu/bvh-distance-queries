@@ -35,7 +35,8 @@ BVH tree for each one, which can then be used for distance quries.
 ## Installation
 
 Before installing anything please make sure to set the environment variable
-*$CUDA_SAMPLES_INC* to the path that contains the header `helper_math.h` (provided by NVidia SDK samples).
+*$CUDA_SAMPLES_INC* to the path that contains the header `helper_math.h` , which
+can be found in the repo [CUDA Samples repository](https://github.com/NVIDIA/cuda-samples).
 To install the module run the following commands:  
 
 **1. Clone this repository**
@@ -51,7 +52,7 @@ pip install -r requirements.txt
 python setup.py install
 ```
 
-If you want to modify any of the code then use the following command:
+If you want to modify any part of the code then use the following command:
 ```Shell
 python setup.py build develop
 ```
