@@ -107,7 +107,6 @@ if __name__ == "__main__":
         vertices = torch.einsum(
             'bij,bmj->bmi',
             [rot_mat, template_v]) + template_translation.unsqueeze(dim=1)
-        vertices = template_v + template_translation.unsqueeze(dim=1)
 
         triangles = vertices[:, template_f].contiguous()
 
