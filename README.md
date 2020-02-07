@@ -90,6 +90,12 @@ python setup.py build develop
 1. [open3d](http://www.open3d.org/)
 1. [mesh](https://github.com/MPI-IS/mesh)
 
+## Running on Cluster
+If you want to run this on the cluster you need to build it using the GPU availabe on the cluster. If you use the local build there might be GPU architecture compatibility issue and you can encounter following error message
+```
+RuntimeError: parallel_for failed: unrecognized error code: unrecognized error code
+```
+
 ## Citation
 
 If you find this code useful in your research please cite the relevant work(s) of the following list:
