@@ -18,6 +18,7 @@
  */
 
 #include <torch/extension.h>
+#include <torch/types.h>
 
 #include "device_launch_parameters.h"
 #include <cuda.h>
