@@ -94,4 +94,4 @@ class PointToMeshResidual(nn.Module):
 
         residual = closest_points - points
 
-        return residual
+        return residual, closest_triangles

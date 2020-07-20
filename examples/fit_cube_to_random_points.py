@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
         triangles = vertices[:, template_f].contiguous()
 
-        residual = m(triangles, scan_points)
+        residual,_ = m(triangles, scan_points)
         loss = residual.pow(2).sum(dim=-1).mean()
 
         if backward:
