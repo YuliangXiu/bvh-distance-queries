@@ -20,8 +20,6 @@ from typing import Tuple, NewType
 
 import torch
 import torch.nn as nn
-import torch.autograd as autograd
-from trimesh.proximity import closest_point
 
 from .bvh_search_tree import BVH
 
@@ -47,6 +45,34 @@ class PointToMeshResidual(nn.Module):
         super(PointToMeshResidual, self).__init__()
         self.search_tree = BVH(sort_points_by_morton=sort_points_by_morton,
                                queue_size=queue_size)
+        
+    @staticmethod
+    def compute_bcs_result(features, 
+                            closest_faces_idxs, 
+                            closest_bcs, 
+                            closest_faces, 
+                            batch_size, 
+                            num_points):
+
+        closest_features_lst = []
+        
+        for feature in features:
+            closest_triangles = feature.view(-1, 3, 3)[
+                closest_faces_idxs + closest_faces].view(
+                    batch_size, num_points, 3, 3)
+            
+            closest_features = (
+                closest_triangles[:, :, 0] *
+                closest_bcs[:, :, 0].unsqueeze(dim=-1) +
+                closest_triangles[:, :, 1] *
+                closest_bcs[:, :, 1].unsqueeze(dim=-1) +
+                closest_triangles[:, :, 2] *
+                closest_bcs[:, :, 2].unsqueeze(dim=-1)
+            )
+            
+            closest_features_lst.append(closest_features)
+        
+        return closest_features_lst
 
     def forward(self,
                 triangles: Tensor,
@@ -90,32 +116,18 @@ class PointToMeshResidual(nn.Module):
             num_triangles
         ).view(batch_size, 1)
         
-        def compute_bcs_result(features):
-
-            closest_triangles = features.view(-1, 3, 3)[
-                closest_faces_idxs + closest_faces].view(
-                    batch_size, num_points, 3, 3)
-                
-            closest_features = (
-                closest_triangles[:, :, 0] *
-                closest_bcs[:, :, 0].unsqueeze(dim=-1) +
-                closest_triangles[:, :, 1] *
-                closest_bcs[:, :, 1].unsqueeze(dim=-1) +
-                closest_triangles[:, :, 2] *
-                closest_bcs[:, :, 2].unsqueeze(dim=-1)
-            )
-            
-            return closest_features
-            
-        closest_points = compute_bcs_result(triangles)
-        closest_normals = compute_bcs_result(normals)
-        closest_cmaps = compute_bcs_result(cmaps)
-            
+        closest_points, closest_normals, closest_cmaps = self.compute_bcs_result([triangles, normals, cmaps],
+                                                 closest_faces_idxs,
+                                                 closest_bcs,
+                                                 closest_faces,
+                                                 batch_size,
+                                                 num_points)
         residual = closest_points - points
         
         # faces [B, FN, 3]
         # cloesest_faces [B, CN]
         # cloesest_bcs [B, CN, 3]
+        
         closest_fids = torch.gather(faces, 1, torch.tile(closest_faces.unsqueeze(-1),(1,1,3)))
         closest_idx = torch.gather(closest_fids, 2, closest_bcs.max(2)[1].unsqueeze(-1)).squeeze(-1)
         
