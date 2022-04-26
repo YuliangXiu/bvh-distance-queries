@@ -57,9 +57,9 @@
 #define FORCE_INLINE 1
 #endif /* ifndef FORCE_INLINE */
 
-#ifndef PROFILING
-#define PROFILING 0
-#endif /* ifndef PROFILING */
+#ifndef BVH_PROFILING
+#define BVH_PROFILING 0
+#endif /* ifndef BVH_PROFILING */
 
 #ifndef ERROR_CHECKING
 #define ERROR_CHECKING 1
@@ -995,7 +995,7 @@ void bvh_distance_queries_kernel(
             points_ptr = morton_sorted_points_ptr;
           }
 
-#ifdef PROFILING
+#ifdef BVH_PROFILING
           cudaProfilerStart();
 #endif
           if (queue_size == 32) {
@@ -1030,7 +1030,7 @@ void bvh_distance_queries_kernel(
                 internal_nodes.data().get(), num_points);
           }
           cudaCheckError();
-#ifdef PROFILING
+#ifdef BVH_PROFILING
           cudaProfilerStop();
 #endif
 
