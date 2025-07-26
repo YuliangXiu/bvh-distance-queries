@@ -898,7 +898,7 @@ void bvh_distance_queries_kernel(
 
   // Construct the bvh tree
   AT_DISPATCH_FLOATING_TYPES(
-      triangles.type(), "bvh_tree_building", ([&] {
+      triangles.scalar_type(), "bvh_tree_building", ([&] {
       // using scalar_t = float;
 
 #if PRINT_TIMINGS == 1
