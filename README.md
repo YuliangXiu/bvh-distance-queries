@@ -53,7 +53,39 @@ If you want to modify any part of the code then use the following command:
 python setup.py build develop
 ```
 
-   
+Updated installation procedure using a conda environment:
+
+```bash
+# Start completely fresh with system tools
+conda deactivate
+conda create -n bvh-cuda python=3.9 -y
+conda activate bvh-cuda
+
+# Install PyTorch with specific CUDA version
+pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+
+# Install cuda toolkit and nvcc
+conda install -c nvidia cuda-nvcc=11.3 -y
+# NOTE: using the nvidia one will miss runtime header files
+conda install -c conda-forge cudatoolkit-dev=11.3 -y
+
+# Install build tools
+conda install ninja -y
+
+# We need to use old gcc 9 version
+sudo apt update
+sudo apt install gcc-9 g++-9
+
+# Use the older system GCC
+export CC=gcc-9
+export CXX=g++-9
+export CUDA_HOME=$CONDA_PREFIX
+export TORCH_CUDA_ARCH_LIST="6.0;7.0"
+
+# Run installation
+python setup.py install
+```
+
 ## Examples
 
 * [Random points to surface](./examples/random_points_to_surface.py): Generate
