@@ -49,8 +49,8 @@
 #include "triangle.hpp"
 
 // Number of threads per block for CUDA kernel launch
-#ifndef NUM_THREADS
-#define NUM_THREADS 256
+#ifndef BVH_NUM_THREADS
+#define BVH_NUM_THREADS 256
 #endif
 
 #ifndef FORCE_INLINE
@@ -675,7 +675,7 @@ __global__ void copy_to_tensor(T *dest, T *source, int *ids, int num_elements) {
   return;
 }
 
-template <typename T, int blockSize = NUM_THREADS>
+template <typename T, int blockSize = BVH_NUM_THREADS>
 void buildBVH(BVHNodePtr<T> internal_nodes, BVHNodePtr<T> leaf_nodes,
               Triangle<T> *__restrict__ triangles,
               thrust::device_vector<int> *triangle_ids, int num_triangles,
@@ -889,7 +889,7 @@ void bvh_distance_queries_kernel(
 
   thrust::device_vector<int> triangle_ids(num_triangles);
 
-  int blockSize = NUM_THREADS;
+  int blockSize = BVH_NUM_THREADS;
 
   int numSMs;
   cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, 0);
@@ -947,7 +947,7 @@ void bvh_distance_queries_kernel(
 #if DEBUG_PRINT == 1
           std::cout << "Start building BVH" << std::endl;
 #endif
-          buildBVH<scalar_t, NUM_THREADS>(
+          buildBVH<scalar_t, BVH_NUM_THREADS>(
               internal_nodes.data().get(), leaf_nodes.data().get(),
               triangles_ptr, &triangle_ids, num_triangles, batch_size);
 #if DEBUG_PRINT == 1
@@ -969,7 +969,7 @@ void bvh_distance_queries_kernel(
 #if PRINT_TIMINGS == 1
             cudaEventRecord(start);
 #endif
-            ComputePointMortonCodes<scalar_t><<<gridSize, NUM_THREADS>>>(
+            ComputePointMortonCodes<scalar_t><<<gridSize, BVH_NUM_THREADS>>>(
                 // morton_sorted_points.data().get(), points_ptr, num_points,
                 morton_sorted_points_ptr, points_ptr, num_points,
                 morton_codes.data().get());
@@ -999,32 +999,32 @@ void bvh_distance_queries_kernel(
           cudaProfilerStart();
 #endif
           if (queue_size == 32) {
-            findNearestNeighbor<scalar_t, 32><<<gridSize, NUM_THREADS>>>(
+            findNearestNeighbor<scalar_t, 32><<<gridSize, BVH_NUM_THREADS>>>(
                 points_ptr, distances_ptr, closest_points_ptr,
                 closest_faces_ptr, closest_bcs_ptr,
                 internal_nodes.data().get(), num_points);
           } else if (queue_size == 64) {
-            findNearestNeighbor<scalar_t, 64><<<gridSize, NUM_THREADS>>>(
+            findNearestNeighbor<scalar_t, 64><<<gridSize, BVH_NUM_THREADS>>>(
                 points_ptr, distances_ptr, closest_points_ptr,
                 closest_faces_ptr, closest_bcs_ptr,
                 internal_nodes.data().get(), num_points);
           } else if (queue_size == 128) {
-            findNearestNeighbor<scalar_t, 128><<<gridSize, NUM_THREADS>>>(
+            findNearestNeighbor<scalar_t, 128><<<gridSize, BVH_NUM_THREADS>>>(
                 points_ptr, distances_ptr, closest_points_ptr,
                 closest_faces_ptr, closest_bcs_ptr,
                 internal_nodes.data().get(), num_points);
           } else if (queue_size == 256) {
-            findNearestNeighbor<scalar_t, 256><<<gridSize, NUM_THREADS>>>(
+            findNearestNeighbor<scalar_t, 256><<<gridSize, BVH_NUM_THREADS>>>(
                 points_ptr, distances_ptr, closest_points_ptr,
                 closest_faces_ptr, closest_bcs_ptr,
                 internal_nodes.data().get(), num_points);
           } else if (queue_size == 512) {
-            findNearestNeighbor<scalar_t, 512><<<gridSize, NUM_THREADS>>>(
+            findNearestNeighbor<scalar_t, 512><<<gridSize, BVH_NUM_THREADS>>>(
                 points_ptr, distances_ptr, closest_points_ptr,
                 closest_faces_ptr, closest_bcs_ptr,
                 internal_nodes.data().get(), num_points);
           } else if (queue_size == 1024) {
-            findNearestNeighbor<scalar_t, 1024><<<gridSize, NUM_THREADS>>>(
+            findNearestNeighbor<scalar_t, 1024><<<gridSize, BVH_NUM_THREADS>>>(
                 points_ptr, distances_ptr, closest_points_ptr,
                 closest_faces_ptr, closest_bcs_ptr,
                 internal_nodes.data().get(), num_points);
@@ -1045,15 +1045,15 @@ void bvh_distance_queries_kernel(
               closest_faces->data<long>() + num_points * bidx;
           if (sort_points_by_morton) {
             copy_to_tensor<scalar_t>
-                <<<gridSize, NUM_THREADS>>>(distances_dest_ptr, distances_ptr,
+                <<<gridSize, BVH_NUM_THREADS>>>(distances_dest_ptr, distances_ptr,
                                             point_ids.data().get(), num_points);
-            copy_to_tensor<vec3<scalar_t>><<<gridSize, NUM_THREADS>>>(
+            copy_to_tensor<vec3<scalar_t>><<<gridSize, BVH_NUM_THREADS>>>(
                 closest_points_dest_ptr, closest_points_ptr,
                 point_ids.data().get(), num_points);
-            copy_to_tensor<vec3<scalar_t> ><<<gridSize, NUM_THREADS>>>(
+            copy_to_tensor<vec3<scalar_t> ><<<gridSize, BVH_NUM_THREADS>>>(
                 closest_bcs_dest_ptr, closest_bcs_ptr,
                 point_ids.data().get(), num_points);
-            copy_to_tensor<long><<<gridSize, NUM_THREADS>>>(
+            copy_to_tensor<long><<<gridSize, BVH_NUM_THREADS>>>(
                 closest_faces_dest_ptr, closest_faces_ptr,
                 point_ids.data().get(), num_points);
           } else {
